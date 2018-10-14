@@ -84,7 +84,7 @@ namespace pisos
 						yd = -1;
 					if (rot == 360)
 						rot = 0;
-					rot += 10;
+					rot += 5;
 					Current.Dispatcher.Invoke(() =>
 					{
 						win.Left += xd * 2 * smp + xd;
@@ -117,11 +117,11 @@ namespace pisos
 		private void Application_Startup(object sender, StartupEventArgs e)
 		{
 			Mouse.OverrideCursor = Cursors.Arrow;
-			/*for (int i = 0; i < 5; i++)
+			for (int i = 0; i < 5; i++)
 			{
 				Window win1 = new Window();
-				win1.Width = 300;
-				win1.Height = 300;
+				win1.Width = 268;
+				win1.Height = 268;
 				for (double r = smprnd.NextDouble() * 1.5; r < 2; r++)
 				{
 					win1.Left = SystemParameters.WorkArea.Left + (smprnd.NextDouble() * (SystemParameters.WorkArea.Right - SystemParameters.WorkArea.Left - win1.Width));
@@ -133,23 +133,24 @@ namespace pisos
 				win1.ShowInTaskbar = false;
 				win1.Background = null;
 				Image img = new Image();
-				img.Width = 300;
-				img.Height = 300;
+				img.ToolTip = "ЛОХ";
+				img.Width = win1.Width;
+				img.Height = win1.Height;
 				img.Source = LoadImage(trh.rawData);
 				win1.Content = img;
 				win1.Show();
 				StartMoveThread(win1, img);
 				Thread.Sleep(0);
 				Thread.Sleep(550);
-			}*/
-			Window dick = new Window();
+			}
+			/*Window dick = new Window();
 			dick.Width = SystemParameters.PrimaryScreenWidth;
 			dick.Height = SystemParameters.PrimaryScreenHeight;
 			dick.Left = 0;
 			dick.Top = 0;
 			dick.WindowStyle = WindowStyle.None;
 			dick.AllowsTransparency = true;
-			dick.Background = null;
+			dick.Background = null;*/
 		}
 	}
 }
